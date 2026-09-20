@@ -1,0 +1,135 @@
+# =============================================================================
+# Build and push - runs on merge to main.
+#
+# Builds only the apps that changed (path filters), pushes them to the dev
+# environment's Artifact Registry, then hands off to deploy.yml to roll dev
+# forward automatically.
+#
+# Prod is deliberately not touched here: promoting to prod is a manual
+# workflow_dispatch of deploy.yml, gated by the prod GitHub Environment's
+# required reviewers.
+# =============================================================================
+
+name: Build and push
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/**'
+      - '.github/workflows/build-and-push.yml'
+      - '.github/workflows/_docker-build.yml'
+  # Manual trigger for rebuilding both images without an app change, e.g.
+  # after a base-image security update.
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        type: choice
+        options: [dev, prod]
+        default: dev
+      force_all:
+        description: 'Build both apps regardless of what changed'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# Never let two deploys of the same environment race. Not cancel-in-progress:
+# a half-finished deploy is worse than a queued one.
+concurrency:
+  group: build-and-push-${{ inputs.environment || 'dev' }}
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Emit a JSON array of apps to build, consumed by the matrix below.
+  # Building the matrix dynamically is what lets path filters skip an app
+  # entirely: a job-level `if` cannot skip individual matrix legs.
+  # ---------------------------------------------------------------------------
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      apps: ${{ steps.collect.outputs.apps }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'apps/frontend/**'
+            backend:
+              - 'apps/backend/**'
+            shared:
+              - '.github/workflows/_docker-build.yml'
+
+      - name: Collect apps to build
+        id: collect
+        env:
+          FRONTEND: ${{ steps.filter.outputs.frontend }}
+          BACKEND: ${{ steps.filter.outputs.backend }}
+          SHARED: ${{ steps.filter.outputs.shared }}
+          FORCE_ALL: ${{ inputs.force_all }}
+        run: |
+          set -euo pipefail
+          apps=()
+          # A change to the shared build workflow affects both images.
+          if [ "${FORCE_ALL}" = "true" ] || [ "${SHARED}" = "true" ]; then
+            apps=(frontend backend)
+          else
+            [ "${FRONTEND}" = "true" ] && apps+=(frontend)
+            [ "${BACKEND}" = "true" ] && apps+=(backend)
+          fi
+
+          if [ ${#apps[@]} -eq 0 ]; then
+            json='[]'
+          else
+            json=$(printf '%s\n' "${apps[@]}" | jq -R . | jq -sc .)
+          fi
+          echo "Building: ${json}"
+          echo "apps=${json}" >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # One matrix leg per changed app, each delegating to the reusable workflow.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build
+    needs: changes
+    if: needs.changes.outputs.apps != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJSON(needs.changes.outputs.apps) }}
+    uses: ./.github/workflows/_docker-build.yml
+    with:
+      app: ${{ matrix.app }}
+      environment: ${{ inputs.environment || 'dev' }}
+      # The commit SHA is the tag: immutable, and traceable back to source.
+      image_tag: ${{ github.sha }}
+    permissions:
+      contents: read
+      id-token: write
+
+  # ---------------------------------------------------------------------------
+  # Roll the environment forward with the images just built.
+  #
+  # deploy.yml resolves the image for any app that was NOT rebuilt by reading
+  # what the Cloud Run service is currently running, so a frontend-only change
+  # does not accidentally revert the backend.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy
+    needs: [changes, build]
+    if: needs.changes.outputs.apps != '[]'
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: ${{ inputs.environment || 'dev' }}
+      release: ${{ github.sha }}
+      auto_apply: true
+    permissions:
+      contents: read
+      id-token: write

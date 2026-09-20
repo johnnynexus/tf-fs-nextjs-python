@@ -1,0 +1,275 @@
+# =============================================================================
+# Deploy - terraform plan and apply against one environment.
+#
+# Two entry points:
+#   * workflow_call    - chained automatically from build-and-push.yml (dev).
+#   * workflow_dispatch - manual promotion, usually to prod.
+#
+# Auth is Workload Identity Federation (OIDC) throughout: no service account
+# keys, no long-lived secrets. The only GitHub secrets this repository needs
+# are none at all - everything below is a non-sensitive Environment variable.
+#
+# Protection: the apply job runs in a GitHub Environment. Configure `prod`
+# with required reviewers and no apply can happen without human approval.
+# =============================================================================
+
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Target environment (dev | prod).'
+        required: true
+        type: string
+      release:
+        description: 'Version stamp, normally the git SHA.'
+        required: true
+        type: string
+      auto_apply:
+        description: 'Apply after a successful plan. false plans only.'
+        required: false
+        default: true
+        type: boolean
+
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Target environment'
+        type: choice
+        options: [dev, prod]
+        default: dev
+      build_images:
+        description: 'Build and push images for this environment first (required the first time you deploy to prod)'
+        type: boolean
+        default: true
+      auto_apply:
+        description: 'Apply after planning (uncheck for a plan-only dry run)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# One deploy per environment at a time. Terraform state locking would catch a
+# collision anyway, but failing fast here is clearer than a lock error.
+concurrency:
+  group: deploy-${{ inputs.environment }}
+  cancel-in-progress: false
+
+env:
+  TERRAFORM_VERSION: '1.9.8'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Optional build step for manual runs. The automatic path (build-and-push)
+  # has already built images, so it passes build_images as unset/false.
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build images
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_images }}
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [frontend, backend]
+    uses: ./.github/workflows/_docker-build.yml
+    with:
+      app: ${{ matrix.app }}
+      environment: ${{ inputs.environment }}
+      image_tag: ${{ github.sha }}
+    permissions:
+      contents: read
+      id-token: write
+
+  # ---------------------------------------------------------------------------
+  # Plan, then apply.
+  #
+  # Both happen in one job so the applied plan is byte-for-byte the one that
+  # was reviewed (`terraform apply tfplan`), rather than a fresh plan that
+  # might have drifted between jobs.
+  # ---------------------------------------------------------------------------
+  terraform:
+    name: Terraform (${{ inputs.environment }})
+    needs: [build]
+    # `always()` lets this run when the build job was skipped, while still
+    # stopping if a build that did run failed.
+    if: ${{ always() && !contains(fromJSON('["failure", "cancelled"]'), needs.build.result) }}
+    runs-on: ubuntu-latest
+
+    # This is the approval gate. Add required reviewers to the `prod`
+    # environment in GitHub settings and prod applies need sign-off.
+    environment:
+      name: ${{ inputs.environment }}
+      url: ${{ steps.outputs.outputs.frontend_url }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    defaults:
+      run:
+        working-directory: infra/terraform/environments/${{ inputs.environment }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      # -----------------------------------------------------------------------
+      # Work out which image each service should run.
+      #
+      # A frontend-only change means no new backend image was built this run.
+      # Passing an empty backend_image would fall back to the bootstrap
+      # placeholder and take the real backend down, so the currently deployed
+      # image is read back from Cloud Run and reused.
+      # -----------------------------------------------------------------------
+      - name: Resolve image references
+        id: images
+        env:
+          REGION: ${{ vars.GCP_REGION }}
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          PROJECT_NAME: ${{ vars.TF_PROJECT_NAME }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          repository="${REGION}-docker.pkg.dev/${PROJECT_ID}/${PROJECT_NAME}-${ENVIRONMENT}"
+
+          resolve() {
+            local app="$1"
+            local candidate="${repository}/${app}:${TAG}"
+            local service="${PROJECT_NAME}-${ENVIRONMENT}-${app}"
+
+            # Preferred: an image built from this exact commit.
+            if gcloud artifacts docker images describe "${candidate}" \
+                 --project "${PROJECT_ID}" >/dev/null 2>&1; then
+              echo "${candidate}"
+              return
+            fi
+
+            # Fallback: whatever the service is running right now.
+            local current
+            current=$(gcloud run services describe "${service}" \
+              --project "${PROJECT_ID}" --region "${REGION}" \
+              --format='value(template.containers[0].image)' 2>/dev/null || true)
+            if [ -n "${current}" ]; then
+              echo "${current}"
+              return
+            fi
+
+            # Nothing exists yet: let Terraform use its bootstrap placeholder.
+            echo ""
+          }
+
+          backend_image="$(resolve backend)"
+          frontend_image="$(resolve frontend)"
+          echo "backend_image=${backend_image}"   >> "$GITHUB_OUTPUT"
+          echo "frontend_image=${frontend_image}" >> "$GITHUB_OUTPUT"
+          echo "Backend image:  ${backend_image:-<placeholder>}"
+          echo "Frontend image: ${frontend_image:-<placeholder>}"
+
+      # The bucket is the only backend setting that varies per environment,
+      # so it is injected rather than committed into backend.tf.
+      - name: Terraform init
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=env/${{ inputs.environment }}"
+
+      - name: Terraform format check
+        run: terraform fmt -check -recursive
+        working-directory: infra/terraform
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      - name: Terraform plan
+        id: plan
+        run: |
+          terraform plan -input=false -no-color -out=tfplan \
+            -var="project_id=${{ vars.GCP_PROJECT_ID }}" \
+            -var="region=${{ vars.GCP_REGION }}" \
+            -var="backend_image=${{ steps.images.outputs.backend_image }}" \
+            -var="frontend_image=${{ steps.images.outputs.frontend_image }}" \
+            -var="release=${{ inputs.release || github.sha }}" \
+            | tee plan.txt
+
+      - name: Publish plan to the job summary
+        run: |
+          {
+            echo "### Terraform plan - \`${{ inputs.environment }}\`"
+            echo ""
+            echo '```terraform'
+            # Trim to keep the summary under GitHub's 1 MiB limit.
+            tail -c 60000 plan.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # Applies the saved plan file, so nothing can change between review and
+      # apply.
+      - name: Terraform apply
+        if: ${{ inputs.auto_apply }}
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Collect outputs
+        id: outputs
+        if: ${{ inputs.auto_apply }}
+        run: |
+          set -euo pipefail
+          frontend_url=$(terraform output -raw frontend_url)
+          backend_url=$(terraform output -raw backend_url)
+          echo "frontend_url=${frontend_url}" >> "$GITHUB_OUTPUT"
+          echo "backend_url=${backend_url}"   >> "$GITHUB_OUTPUT"
+
+      # Proves the deploy actually works, rather than just that Terraform
+      # reported success.
+      - name: Smoke test
+        if: ${{ inputs.auto_apply }}
+        env:
+          FRONTEND_URL: ${{ steps.outputs.outputs.frontend_url }}
+          BACKEND_URL: ${{ steps.outputs.outputs.backend_url }}
+        run: |
+          set -euo pipefail
+
+          check() {
+            local name="$1" url="$2"
+            echo "Checking ${name}: ${url}"
+            for attempt in 1 2 3 4 5; do
+              code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 15 "${url}" || echo 000)
+              if [ "${code}" = "200" ]; then
+                echo "  ${name} OK"
+                return 0
+              fi
+              echo "  attempt ${attempt}: HTTP ${code}, retrying..."
+              sleep 10
+            done
+            echo "::error::${name} did not become healthy at ${url}"
+            return 1
+          }
+
+          check "backend health" "${BACKEND_URL}/health"
+          check "frontend health" "${FRONTEND_URL}/api/health"
+
+      - name: Deployment summary
+        if: ${{ inputs.auto_apply }}
+        run: |
+          {
+            echo "### Deployed to \`${{ inputs.environment }}\`"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Frontend | ${{ steps.outputs.outputs.frontend_url }} |"
+            echo "| Backend | ${{ steps.outputs.outputs.backend_url }} |"
+            echo "| Release | \`${{ inputs.release || github.sha }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"

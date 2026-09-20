@@ -1,0 +1,20 @@
+# Keep the build context small and avoid leaking local state into the image.
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.env
+.env.*
+!.env.example
+tests/
+*.md
+.git/
+.github/
+dist/
+build/
+*.egg-info/
+htmlcov/
+.coverage

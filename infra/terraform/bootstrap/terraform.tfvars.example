@@ -1,0 +1,18 @@
+# Copy to terraform.tfvars and fill in before running the bootstrap:
+#   cp terraform.tfvars.example terraform.tfvars
+
+# The GCP project that will own the state bucket and the OIDC pool.
+project_id = "my-project-dev"
+region     = "us-west1"
+
+# Must be globally unique across all of GCS.
+state_bucket_name = "my-org-tfs-tfstate"
+
+# Only this repository's workflows can authenticate. This is the security
+# boundary - get it exactly right.
+github_repository = "my-org/tf-fs-nextjs-python"
+
+# Pool and provider IDs cannot be reused for 30 days after deletion, so
+# including a date or suffix makes recreating painless.
+pool_id     = "github-pool"
+provider_id = "github-provider"

@@ -1,0 +1,62 @@
+# ---- Secrets -----------------------------------------------------------
+# Nothing with real credentials is ever committed. Only *.example files are.
+.env
+.env.local
+.env.*.local
+!.env.example
+!apps/frontend/.env.development
+!apps/frontend/.env.production
+*.pem
+*.key
+service-account*.json
+gcp-credentials*.json
+
+# ---- Node / Next.js ----------------------------------------------------
+node_modules/
+.next/
+out/
+build/
+.eslintcache
+*.tsbuildinfo
+next-env.d.ts
+
+# ---- Python ------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+htmlcov/
+.coverage
+coverage.xml
+
+# ---- Terraform ---------------------------------------------------------
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+# Per-environment tfvars ARE committed (they hold no secrets); local
+# overrides are not.
+*.auto.tfvars
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+tfplan
+*.tfplan
+
+# ---- Editors / OS ------------------------------------------------------
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp

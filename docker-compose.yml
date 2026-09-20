@@ -1,0 +1,104 @@
+# =============================================================================
+# Local development stack: Postgres + FastAPI + Next.js.
+#
+#   docker compose up --build     start everything
+#   docker compose down -v        stop and wipe the database volume
+#
+#   frontend  http://localhost:3000
+#   backend   http://localhost:8000      (docs at /docs)
+#   postgres  localhost:5432             (app / app / app)
+#
+# Both app containers run with hot reload against bind-mounted source, so this
+# is a real development environment rather than a demo. The images are the
+# same ones deployed to Cloud Run, with dev-only overrides applied here.
+# =============================================================================
+
+name: tf-fs-nextjs-python
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-app}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-app}
+      POSTGRES_DB: ${POSTGRES_DB:-app}
+    ports:
+      # Exposed so you can psql from the host and run the database-backed
+      # tests outside Docker. Override POSTGRES_HOST_PORT if you already have
+      # Postgres listening on 5432 locally.
+      - '${POSTGRES_HOST_PORT:-5432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      # The backend waits for this, so it never starts against a database
+      # that is still initialising.
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-app} -d ${POSTGRES_DB:-app}']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+
+  backend:
+    build:
+      context: ./apps/backend
+      target: runtime
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: local
+      DEBUG: 'true'
+      LOG_LEVEL: INFO
+      RELEASE: local
+      PORT: '8000'
+      CORS_ORIGINS: http://localhost:3000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-app}:${POSTGRES_PASSWORD:-app}@db:5432/${POSTGRES_DB:-app}
+      # Makes the bind-mounted source below take precedence over the copy
+      # installed into the venv at image build time.
+      PYTHONPATH: /app
+    volumes:
+      - ./apps/backend/app:/app/app:ro
+    ports:
+      - '${BACKEND_HOST_PORT:-8000}:8000'
+    depends_on:
+      db:
+        condition: service_healthy
+    # Override the production command to enable auto-reload on file changes.
+    command: >
+      sh -c "exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app"
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      # The `dev` stage runs `next dev`; the deployed image uses `runner`.
+      target: dev
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: '3000'
+      HOSTNAME: 0.0.0.0
+      # Service DNS name on the compose network, not localhost: the frontend
+      # container reaches the backend container, not the host.
+      BACKEND_INTERNAL_URL: http://backend:8000
+      NEXT_PUBLIC_RELEASE: local
+      # Polling is needed for reliable file watching across the bind mount on
+      # macOS and Windows.
+      WATCHPACK_POLLING: 'true'
+    volumes:
+      - ./apps/frontend/src:/app/src
+      - ./apps/frontend/public:/app/public
+      - ./apps/frontend/next.config.mjs:/app/next.config.mjs:ro
+      - ./apps/frontend/tailwind.config.ts:/app/tailwind.config.ts:ro
+      - ./apps/frontend/postcss.config.mjs:/app/postcss.config.mjs:ro
+      - ./apps/frontend/tsconfig.json:/app/tsconfig.json:ro
+      # Anonymous volumes keep the container's own node_modules and .next
+      # from being shadowed by (or written into) the host directory.
+      - /app/node_modules
+      - /app/.next
+    ports:
+      - '${FRONTEND_HOST_PORT:-3000}:3000'
+    depends_on:
+      backend:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

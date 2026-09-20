@@ -1,0 +1,160 @@
+# =============================================================================
+# Reusable workflow: build one app's Docker image and push it to Artifact
+# Registry.
+#
+# Called with a matrix by build-and-push.yml and deploy.yml, so the auth,
+# buildx, caching and tagging steps are written once instead of being
+# duplicated per app. The only differences between frontend and backend are
+# the build context and the build args, which are handled below.
+#
+# Authentication is Workload Identity Federation (OIDC): GitHub mints a
+# short-lived token that GCP exchanges for credentials. No service account
+# key exists, so there is nothing to leak or rotate.
+# =============================================================================
+
+name: Reusable - build and push image
+
+on:
+  workflow_call:
+    inputs:
+      app:
+        description: 'Which app to build: frontend or backend.'
+        required: true
+        type: string
+      environment:
+        description: 'GitHub Environment supplying the GCP variables (dev | prod).'
+        required: true
+        type: string
+      image_tag:
+        description: 'Primary image tag, normally the git SHA.'
+        required: true
+        type: string
+      push:
+        description: 'Push the image. false builds only, for validating a PR.'
+        required: false
+        default: true
+        type: boolean
+    outputs:
+      image:
+        description: 'Digest-pinned image reference, safe to hand to Terraform.'
+        value: ${{ jobs.build.outputs.image }}
+      image_tagged:
+        description: 'Tag-based image reference (registry/app:tag).'
+        value: ${{ jobs.build.outputs.image_tagged }}
+      digest:
+        description: 'sha256 digest of the pushed image.'
+        value: ${{ jobs.build.outputs.digest }}
+
+jobs:
+  build:
+    name: Build ${{ inputs.app }}
+    runs-on: ubuntu-latest
+
+    # Reads the GCP variables scoped to this environment. Note that for an
+    # environment with required reviewers (prod), this job waits for approval
+    # too - approving the build of a prod artifact, then approving its
+    # deployment. See docs/cicd.md if you would rather have a single gate.
+    environment: ${{ inputs.environment }}
+
+    permissions:
+      contents: read
+      # Required for the OIDC token. Without it, google-github-actions/auth
+      # cannot mint a credential.
+      id-token: write
+
+    outputs:
+      image: ${{ steps.refs.outputs.image_digest }}
+      image_tagged: ${{ steps.refs.outputs.image_tagged }}
+      digest: ${{ steps.push.outputs.digest }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image references
+        id: names
+        env:
+          REGION: ${{ vars.GCP_REGION }}
+          PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+          # Must match `project_name` in the environment's terraform.tfvars,
+          # because the stack names the repository "<project_name>-<env>".
+          PROJECT_NAME: ${{ vars.TF_PROJECT_NAME }}
+          ENVIRONMENT: ${{ inputs.environment }}
+          APP: ${{ inputs.app }}
+        run: |
+          set -euo pipefail
+          registry="${REGION}-docker.pkg.dev"
+          repository="${registry}/${PROJECT_ID}/${PROJECT_NAME}-${ENVIRONMENT}"
+          echo "registry=${registry}"           >> "$GITHUB_OUTPUT"
+          echo "image_base=${repository}/${APP}" >> "$GITHUB_OUTPUT"
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      # Registers gcloud as a Docker credential helper for this registry.
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${{ steps.names.outputs.registry }}" --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        id: push
+        uses: docker/build-push-action@v6
+        with:
+          context: apps/${{ inputs.app }}
+          file: apps/${{ inputs.app }}/Dockerfile
+          push: ${{ inputs.push }}
+          # Two tags: the immutable SHA (what gets deployed) and a moving
+          # pointer for humans debugging "what is on main right now".
+          tags: |
+            ${{ steps.names.outputs.image_base }}:${{ inputs.image_tag }}
+            ${{ steps.names.outputs.image_base }}:latest
+          # GitHub Actions layer cache: turns a rebuild of unchanged
+          # dependencies into a cache hit.
+          cache-from: type=gha,scope=${{ inputs.app }}
+          cache-to: type=gha,mode=max,scope=${{ inputs.app }}
+          # Stamp the build so a running container can be traced to a commit.
+          # NEXT_PUBLIC_* must be a build arg: Next inlines it at build time.
+          # NEXT_PUBLIC_API_BASE_URL is deliberately left unset so the browser
+          # uses the frontend's same-origin /api/backend proxy.
+          build-args: |
+            RELEASE=${{ inputs.image_tag }}
+            NEXT_PUBLIC_RELEASE=${{ inputs.image_tag }}
+          # Cloud Run rejects the default OCI provenance attestation.
+          provenance: false
+          sbom: false
+
+      - name: Export digest-pinned reference
+        id: refs
+        env:
+          IMAGE_BASE: ${{ steps.names.outputs.image_base }}
+          TAG: ${{ inputs.image_tag }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          set -euo pipefail
+          echo "image_tagged=${IMAGE_BASE}:${TAG}" >> "$GITHUB_OUTPUT"
+          # Deploying by digest rather than by tag guarantees the revision
+          # runs exactly the bytes this job built, even if the tag is later
+          # moved.
+          if [ -n "${DIGEST}" ]; then
+            echo "image_digest=${IMAGE_BASE}@${DIGEST}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_digest=${IMAGE_BASE}:${TAG}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Summary
+        run: |
+          {
+            echo "### Built \`${{ inputs.app }}\`"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Environment | \`${{ inputs.environment }}\` |"
+            echo "| Tag | \`${{ steps.refs.outputs.image_tagged }}\` |"
+            echo "| Digest | \`${{ steps.push.outputs.digest }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
