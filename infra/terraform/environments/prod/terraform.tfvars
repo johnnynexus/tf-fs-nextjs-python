@@ -4,12 +4,17 @@
 # Committed on purpose: no secrets here. See dev/terraform.tfvars for the
 # reasoning.
 #
-# REQUIRED: replace project_id with your own GCP project before applying.
-# Use a *separate project* from dev - it is the only hard isolation boundary
-# GCP offers for quota, IAM and billing.
+# Currently shares the dev project (a personal sandbox), which is fine for a
+# reference implementation: resource names are prefixed tfs-prod-* and the
+# state lives under its own prefix.
+#
+# For anything real, move this to a separate project - it is the only hard
+# isolation boundary GCP offers for quota, IAM and billing. Doing so means a
+# second bootstrap run and updating this file plus backend.hcl and the prod
+# GitHub Environment variables.
 # -----------------------------------------------------------------------------
 
-project_id   = "REPLACE_ME-prod"
+project_id   = "nexus-gcloud-sandbox"
 project_name = "tfs"
 region       = "us-west1"
 
