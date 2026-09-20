@@ -151,10 +151,16 @@ jobs:
             local candidate="${repository}/${app}:${TAG}"
             local service="${PROJECT_NAME}-${ENVIRONMENT}-${app}"
 
-            # Preferred: an image built from this exact commit.
-            if gcloud artifacts docker images describe "${candidate}" \
-                 --project "${PROJECT_ID}" >/dev/null 2>&1; then
-              echo "${candidate}"
+            # Preferred: an image built from this exact commit, resolved to
+            # its digest. Deploying by digest rather than by tag pins the
+            # revision to exactly the bytes CI built, even if the tag is
+            # later moved to a different image.
+            local digest
+            digest=$(gcloud artifacts docker images describe "${candidate}" \
+              --project "${PROJECT_ID}" \
+              --format='value(image_summary.digest)' 2>/dev/null || true)
+            if [ -n "${digest}" ]; then
+              echo "${repository}/${app}@${digest}"
               return
             fi
 
