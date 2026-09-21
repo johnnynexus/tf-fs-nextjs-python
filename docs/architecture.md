@@ -4,6 +4,7 @@
 
 | Component        | Technology                | Where it runs                     |
 | ---------------- | ------------------------- | --------------------------------- |
+| Dashboard data   | USGS earthquake feed      | fetched by the backend, cached 60s |
 | Frontend         | Next.js 15 (App Router)   | Cloud Run (container)             |
 | Backend          | FastAPI + uvicorn         | Cloud Run (container)             |
 | Database         | PostgreSQL 16             | Cloud SQL, private IP — optional  |
@@ -63,6 +64,8 @@ ordinary runtime env var that Terraform sets on the service.
 ```
 app/
   core/config.py     every env var, declared and typed (pydantic-settings)
+  services/usgs_service.py  I/O split from pure aggregation, so the maths
+                     is unit-tested against a fixture with no network
   core/logging.py    plain console locally, JSON for Cloud Logging elsewhere
   db/base.py         declarative base + created/updated timestamp mixin
   db/session.py      async engine, session dependency, connection probe

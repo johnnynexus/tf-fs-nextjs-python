@@ -4,6 +4,10 @@ A reference full-stack monorepo: **Next.js** frontend, **FastAPI** backend,
 **Terraform** infrastructure on **Google Cloud Run**, and **GitHub Actions**
 CI/CD using OIDC — no long-lived cloud credentials anywhere.
 
+It ships a live **seismic dashboard** at `/dashboard`: USGS earthquake data
+fetched and aggregated by the backend, charted in hand-rolled SVG with no
+charting library.
+
 Everything here runs. `docker compose up` gives you a working local stack with
 hot reload and a real Postgres; the Terraform plans cleanly; the workflows
 pass `actionlint`.
@@ -63,12 +67,15 @@ environment costs approximately nothing.
 .
 ├── apps/
 │   ├── frontend/          Next.js 15, App Router, TypeScript, Tailwind
-│   │   ├── src/app/       routes, incl. the /api/backend proxy
+│   │   ├── src/app/       routes, incl. /dashboard and the /api/backend proxy
 │   │   ├── src/lib/api.ts typed API client
+│   │   ├── src/lib/viz.ts scales, ticks, path builders (replaces a chart lib)
+│   │   ├── src/components/charts/     hand-rolled SVG charts
 │   │   └── Dockerfile     multi-stage; dev stage + standalone runtime
 │   └── backend/           FastAPI
 │       ├── app/core/      pydantic-settings config, logging
 │       ├── app/db/        async SQLAlchemy engine + session
+│       ├── app/services/usgs_service.py   USGS fetch + aggregation
 │       ├── app/routers/   HTTP layer (thin)
 │       ├── app/services/  business logic
 │       ├── tests/         pytest, async, in-process ASGI client
@@ -107,6 +114,7 @@ docker compose up --build
 | Service   | URL                            |
 | --------- | ------------------------------ |
 | Frontend  | http://localhost:3000          |
+| Dashboard | http://localhost:3000/dashboard |
 | Backend   | http://localhost:8000          |
 | API docs  | http://localhost:8000/docs     |
 | Postgres  | localhost:5432 (`app`/`app`/`app`) |
@@ -314,6 +322,8 @@ nothing sensitive.
 | GET    | `/api/v1/hello`   | Example endpoint the frontend calls.     |
 | GET    | `/api/v1/items`   | 503 when no database is configured.      |
 | POST   | `/api/v1/items`   | 503 when no database is configured.      |
+| GET    | `/api/v1/quakes/summary` | Aggregated USGS data for the dashboard. 503 if USGS is unreachable. |
+| POST   | `/api/v1/quakes/cache/clear` | Drop the cached summaries.   |
 
 ## Design decisions
 
@@ -345,6 +355,21 @@ holds identity, probes, scaling, secrets and VPC wiring;
 **Environments are directories, not workspaces.** Explicit targets, per-env
 backend config, and no chance of applying to prod because a workspace was left
 selected.
+
+**No charting library.** The dashboard's scales, ticks and path builders are
+about 200 lines in `src/lib/viz.ts`. That is less code than the configuration
+needed to force a charting library to match the required mark specs, adds
+nothing to the bundle (the whole `/dashboard` route is ~7 kB), and avoids the
+React 19 peer-dependency churn. Chart colour comes from a validated palette in
+`globals.css`, with separate ramps for continuous magnitude, ordered bands and
+identity — and the ordered ramp is capped at five steps because a sixth fails
+the adjacent-lightness check.
+
+**Third-party data degrades one page, not the service.** If USGS is
+unreachable the dashboard renders an explanatory empty state and the API
+returns 503, while `/health` and `/health/ready` stay green. Readiness must
+never be hostage to someone else's uptime — the same rule the database
+follows.
 
 **No CORS dependency cycle.** The backend is not given the frontend's URL
 automatically, because the frontend needs the backend's URL — that would be a

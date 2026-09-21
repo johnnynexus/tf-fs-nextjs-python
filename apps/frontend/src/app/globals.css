@@ -22,3 +22,150 @@ body {
     @apply bg-slate-950 text-slate-100;
   }
 }
+
+/* ===========================================================================
+   Data-visualisation tokens.
+
+   Charts are written against these roles, never raw hex, so light/dark swap
+   in one place. Values come from the project's validated reference palette.
+
+   Three ramps, three different jobs:
+     --seq-*   continuous magnitude (the lightest step may recede)
+     --ord-*   ordered discrete bands (every step must stay visible: >=2:1)
+     --series-* identity, fixed order, never cycled
+
+   Dark is a *selected* set of steps for the dark surface, not an automatic
+   inversion. The sequential and ordinal ramps reverse direction by mode: on
+   light, more-is-darker; on dark, more-is-lighter. In both cases "more"
+   means more contrast against the surface, which is what carries magnitude.
+
+   Declared under both the media query and the [data-theme] scope so an
+   explicit theme choice wins over the OS setting in either direction.
+   =========================================================================== */
+
+.viz-root {
+  color-scheme: light;
+
+  --surface-1: #fcfcfb;
+  --surface-2: #ffffff;
+  --border-subtle: #e6e5e1;
+
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #77756e;
+
+  /* Recessive grid/axis - present, never competing with the data. */
+  --grid: #e9e8e3;
+  --axis: #c9c7c0;
+
+  /* Sequential blue, low -> high. */
+  --seq-1: #cde2fb;
+  --seq-2: #9ec5f4;
+  --seq-3: #6da7ec;
+  --seq-4: #3987e5;
+  --seq-5: #256abf;
+  --seq-6: #0d366b;
+
+  /* Ordinal ramp for ordered categories (the magnitude bands). Starts at
+     ramp step 250, not 100: a discrete bar must not recede into the surface
+     the way the lightest step of a continuous heatmap legitimately can.
+
+     Five steps, not more - the validator rejects a sixth because adjacent
+     lightness gaps fall below 0.06 and the bands stop being tellable apart.
+     The backend's magnitude bands were reduced to five to match. */
+  --ord-1: #86b6ef;
+  --ord-2: #5598e7;
+  --ord-3: #2a78d6;
+  --ord-4: #1c5cab;
+  --ord-5: #0d366b;
+
+  /* Categorical slots (identity), fixed order, never cycled. */
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+
+  /* Status - reserved, never reused as a series. Always with icon + label. */
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme='light'])) .viz-root {
+    color-scheme: dark;
+
+    --surface-1: #1a1a19;
+    --surface-2: #222221;
+    --border-subtle: #34332f;
+
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #9a988e;
+
+    --grid: #2c2b28;
+    --axis: #45443f;
+
+    /* Reversed: on a dark surface, lighter reads as "more". */
+    --seq-1: #184f95;
+    --seq-2: #256abf;
+    --seq-3: #3987e5;
+    --seq-4: #6da7ec;
+    --seq-5: #9ec5f4;
+    --seq-6: #cde2fb;
+
+    /* Dark ordinal: reversed, floored at ramp step 600 - the darkest that
+       still clears 2:1 on the dark surface. */
+    --ord-1: #184f95;
+    --ord-2: #256abf;
+    --ord-3: #3987e5;
+    --ord-4: #6da7ec;
+    --ord-5: #cde2fb;
+
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+  }
+}
+
+:root[data-theme='dark'] .viz-root {
+  color-scheme: dark;
+
+  --surface-1: #1a1a19;
+  --surface-2: #222221;
+  --border-subtle: #34332f;
+
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #9a988e;
+
+  --grid: #2c2b28;
+  --axis: #45443f;
+
+  /* Reversed: on a dark surface, lighter reads as "more". */
+  --seq-1: #184f95;
+  --seq-2: #256abf;
+  --seq-3: #3987e5;
+  --seq-4: #6da7ec;
+  --seq-5: #9ec5f4;
+  --seq-6: #cde2fb;
+
+  /* Dark ordinal: reversed, floored at ramp step 600 - the darkest that
+     still clears 2:1 on the dark surface. */
+  --ord-1: #184f95;
+  --ord-2: #256abf;
+  --ord-3: #3987e5;
+  --ord-4: #6da7ec;
+  --ord-5: #cde2fb;
+
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+}
+
+/* The dashboard paints its own surface rather than inheriting the body's,
+   so chart tokens and background stay consistent. */
+.viz-root {
+  background-color: var(--surface-1);
+  color: var(--text-primary);
+}

@@ -7,10 +7,11 @@ file.
 
 from fastapi import APIRouter
 
-from app.routers import hello, items
+from app.routers import hello, items, quakes
 
 api_router = APIRouter()
 api_router.include_router(hello.router)
 api_router.include_router(items.router)
+api_router.include_router(quakes.router)
 
 __all__ = ["api_router"]

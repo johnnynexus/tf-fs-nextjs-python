@@ -73,6 +73,21 @@ class Settings(BaseSettings):
             return [origin.strip() for origin in stripped.split(",") if origin.strip()]
         return value
 
+    # --- USGS earthquake feed ---------------------------------------------
+    # The dashboard's data source. No API key required, which is why it was
+    # chosen: a fresh clone works with no credentials to obtain.
+    usgs_base_url: str = "https://earthquake.usgs.gov/fdsnws/event/1/query"
+    usgs_timeout_seconds: float = 10.0
+
+    # Responses are cached in-process for this long. USGS updates roughly once
+    # a minute, so a short TTL keeps the dashboard live while collapsing a
+    # burst of pageviews into a single upstream request.
+    quakes_cache_ttl_seconds: int = 60
+
+    # Upper bound on events pulled per request. Keeps both the upstream
+    # payload and the JSON sent to the browser predictable.
+    usgs_max_events: int = 2000
+
     # --- Database ---------------------------------------------------------
     # Optional on purpose: the service must start and serve /health and
     # /api/v1/hello with no database attached, which is how it is deployed by

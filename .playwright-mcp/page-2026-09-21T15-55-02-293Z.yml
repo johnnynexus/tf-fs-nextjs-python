@@ -1,0 +1,241 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - generic [ref=e5]:
+      - heading "Global seismic activity" [level=1] [ref=e6]
+      - paragraph [ref=e7]: Live USGS data, fetched and aggregated by the FastAPI backend, rendered without a charting library.
+    - link "← Connectivity check" [ref=e8] [cursor=pointer]:
+      - /url: /
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - group "Time range" [ref=e11]:
+        - button "24 hours" [ref=e12] [cursor=pointer]
+        - button "7 days" [pressed] [ref=e13] [cursor=pointer]
+        - button "30 days" [ref=e14] [cursor=pointer]
+      - paragraph [ref=e15]: M2.5+ · updated just now · cached
+    - generic [ref=e16]:
+      - paragraph [ref=e17]: Strongest event
+      - generic [ref=e18]:
+        - generic [ref=e19]: M6.5
+        - generic [ref=e20]: 169 km W of Nikolski, Alaska
+        - generic [ref=e21]:
+          - generic [aria-hidden] [ref=e22]: ●
+          - text: Green
+    - generic [ref=e23]:
+      - generic [ref=e24]:
+        - paragraph [ref=e25]: Total events
+        - paragraph [ref=e26]: "342"
+        - paragraph [ref=e27]: in the last 7 days
+      - generic [ref=e30]:
+        - paragraph [ref=e31]: Significant
+        - paragraph [ref=e32]: "113"
+        - paragraph [ref=e33]: magnitude 4.5 or greater
+      - generic [ref=e34]:
+        - paragraph [ref=e35]: Median depth
+        - paragraph [ref=e36]: 18.4 km
+        - paragraph [ref=e37]: half were shallower
+      - generic [ref=e38]:
+        - paragraph [ref=e39]: Tsunami flagged
+        - paragraph [ref=e40]: "2"
+        - paragraph [ref=e41]: events with a tsunami notice
+    - generic [ref=e42]:
+      - generic [ref=e43]:
+        - heading "Events over time" [level=2] [ref=e44]
+        - paragraph [ref=e45]: Count per 6 hours
+      - img "Earthquake count per time bucket over the past week" [ref=e47]:
+        - generic [ref=e48]:
+          - generic [ref=e49]: "0"
+          - generic [ref=e51]: "5"
+          - generic [ref=e53]: "10"
+          - generic [ref=e55]: "15"
+          - generic [ref=e57]: "20"
+          - generic [ref=e59]: "25"
+          - generic [ref=e63]: Mon
+          - generic [ref=e64]: Tue
+          - generic [ref=e65]: Wed
+          - generic [ref=e66]: Fri
+          - generic [ref=e67]: Sat
+          - generic [ref=e68]: Sun
+      - paragraph [ref=e69]: Hover for the exact count and strongest event in each bucket. Empty periods are shown, not skipped.
+    - generic [ref=e70]:
+      - generic [ref=e71]:
+        - generic [ref=e72]:
+          - heading "Magnitude distribution" [level=2] [ref=e73]
+          - paragraph [ref=e74]: Events per magnitude band
+        - img "Distribution of earthquakes by magnitude band" [ref=e76]:
+          - generic [ref=e77]:
+            - generic [ref=e78]: "0"
+            - generic [ref=e80]: "50"
+            - generic [ref=e82]: "100"
+            - generic [ref=e84]: "150"
+            - generic [ref=e86]: M0–1
+            - generic [ref=e88]: M1–2
+            - generic [ref=e90]:
+              - generic [ref=e92]: "111"
+              - generic [ref=e93]: M2–3
+            - generic [ref=e94]:
+              - generic [ref=e96]: "68"
+              - generic [ref=e97]: M3–4
+            - generic [ref=e98]:
+              - generic [ref=e100]: "127"
+              - generic [ref=e101]: M4–5
+            - generic [ref=e102]:
+              - generic [ref=e104]: "34"
+              - generic [ref=e105]: M5–6
+            - generic [ref=e106]:
+              - generic [ref=e108]: "2"
+              - generic [ref=e109]: M6–7
+            - generic [ref=e110]: M7+
+        - paragraph [ref=e112]: Colour tracks the magnitude band; bar height is how many events fell in it.
+      - generic [ref=e113]:
+        - generic [ref=e114]:
+          - heading "Most active regions" [level=2] [ref=e115]
+          - paragraph [ref=e116]: Top regions by event count
+        - img "Regions with the most earthquakes in the selected window" [ref=e118]:
+          - generic [ref=e119]:
+            - generic [ref=e120]:
+              - generic [ref=e121]: Alaska
+              - generic [ref=e123]: "94"
+            - generic [ref=e124]:
+              - generic [ref=e125]: Puerto Rico
+              - generic [ref=e127]: "41"
+            - generic [ref=e128]:
+              - generic [ref=e129]: Indonesia
+              - generic [ref=e131]: "22"
+            - generic [ref=e132]:
+              - generic [ref=e133]: Colombia
+              - generic [ref=e135]: "16"
+            - generic [ref=e136]:
+              - generic [ref=e137]: Japan
+              - generic [ref=e139]: "11"
+            - generic [ref=e140]:
+              - generic [ref=e141]: CA
+              - generic [ref=e143]: "11"
+            - generic [ref=e144]:
+              - generic [ref=e145]: Hawaii
+              - generic [ref=e147]: "10"
+            - generic [ref=e148]:
+              - generic [ref=e149]: Papua New Guinea
+              - generic [ref=e151]: "8"
+        - paragraph [ref=e152]: Regions are derived from the USGS place description.
+    - generic [ref=e153]:
+      - generic [ref=e154]:
+        - heading "Depth versus magnitude" [level=2] [ref=e155]
+        - paragraph [ref=e156]: 342 strongest events
+      - img "Earthquake depth plotted against magnitude" [ref=e158]:
+        - generic [ref=e159]:
+          - generic [ref=e160]: "0"
+          - generic [ref=e162]: "100"
+          - generic [ref=e164]: "200"
+          - generic [ref=e166]: "300"
+          - generic [ref=e168]: "400"
+          - generic [ref=e170]: "500"
+          - generic [ref=e172]: "600"
+          - generic [ref=e174]: "700"
+          - generic [ref=e176]: M0
+          - generic [ref=e177]: M1
+          - generic [ref=e178]: M2
+          - generic [ref=e179]: M3
+          - generic [ref=e180]: M4
+          - generic [ref=e181]: M5
+          - generic [ref=e182]: M6
+          - generic [ref=e183]: M7
+          - generic [ref=e868]: km
+      - paragraph [ref=e869]: Depth increases downward, so the earth's surface is at the top. Most quakes are shallow; deep events cluster along subduction zones.
+    - generic [ref=e870]:
+      - generic [ref=e871]:
+        - heading "Recent significant events" [level=2] [ref=e872]
+        - paragraph [ref=e873]: Magnitude 4.5 and above, most recent first
+      - table [ref=e875]:
+        - caption [ref=e876]: Most recent significant earthquakes in the selected window
+        - rowgroup [ref=e877]:
+          - row [ref=e878]:
+            - columnheader "Magnitude" [ref=e879]
+            - columnheader "Location" [ref=e880]
+            - columnheader "Depth" [ref=e881]
+            - columnheader "When" [ref=e882]
+            - columnheader "Alert" [ref=e883]
+        - rowgroup [ref=e884]:
+          - row [ref=e885]:
+            - cell "M5.0" [ref=e886]
+            - cell [ref=e887]:
+              - link "38 km E of Nobeoka, Japan" [ref=e888] [cursor=pointer]:
+                - /url: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tixp
+            - cell "42.7 km" [ref=e889]
+            - cell "Sep 21, 06:38 AM" [ref=e890]
+            - cell "—" [ref=e891]
+          - row [ref=e892]:
+            - cell "M4.7" [ref=e893]
+            - cell [ref=e894]:
+              - link "76 km W of Ollagüe, Chile" [ref=e895] [cursor=pointer]:
+                - /url: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tixg
+            - cell "121.2 km" [ref=e896]
+            - cell "Sep 21, 05:17 AM" [ref=e897]
+            - cell "—" [ref=e898]
+          - row [ref=e899]:
+            - cell "M5.2" [ref=e900]
+            - cell [ref=e901]:
+              - link "167 km WNW of Mejillones, Chile" [ref=e902] [cursor=pointer]:
+                - /url: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tixc
+            - cell "10.0 km" [ref=e903]
+            - cell "Sep 21, 04:48 AM" [ref=e904]
+            - cell "—" [ref=e905]
+          - row [ref=e906]:
+            - cell "M4.7" [ref=e907]
+            - cell [ref=e908]:
+              - link "95 km ENE of Khorugh, Tajikistan" [ref=e909] [cursor=pointer]:
+                - /url: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tiwz
+            - cell "129.3 km" [ref=e910]
+            - cell "Sep 21, 03:48 AM" [ref=e911]
+            - cell "—" [ref=e912]
+          - row [ref=e913]:
+            - cell "M5.0" [ref=e914]
+            - cell [ref=e915]:
+              - link "34 km WNW of Luwuk, Indonesia" [ref=e916] [cursor=pointer]:
+                - /url: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tiw4
+            - cell "9.9 km" [ref=e917]
+            - cell "Sep 21, 12:31 AM" [ref=e918]
+            - cell "—" [ref=e919]
+          - row [ref=e920]:
+            - cell "M4.7" [ref=e921]
+            - cell [ref=e922]:
+              - link "156 km NNW of Hicks Bay, New Zealand" [ref=e923] [cursor=pointer]:
+                - /url: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tivi
+            - cell "213.0 km" [ref=e924]
+            - cell "Sep 20, 09:28 PM" [ref=e925]
+            - cell "—" [ref=e926]
+          - row [ref=e927]:
+            - cell "M4.5" [ref=e928]
+            - cell [ref=e929]:
+              - link "4 km W of Victor Raul, Peru" [ref=e930] [cursor=pointer]:
+                - /url: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tivb
+            - cell "73.1 km" [ref=e931]
+            - cell "Sep 20, 08:58 PM" [ref=e932]
+            - cell "—" [ref=e933]
+          - row [ref=e934]:
+            - cell "M5.5" [ref=e935]
+            - cell [ref=e936]:
+              - link "35 km NNE of Ruteng, Indonesia" [ref=e937] [cursor=pointer]:
+                - /url: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tiur
+            - cell "10.0 km" [ref=e938]
+            - cell "Sep 20, 06:41 PM" [ref=e939]
+            - cell [ref=e940]:
+              - generic [ref=e941]:
+                - generic [aria-hidden] [ref=e942]: ●
+                - text: Green
+          - row [ref=e943]:
+            - cell "M4.9" [ref=e944]
+            - cell [ref=e945]:
+              - link "26 km SE of Saimbeyli, Turkey" [ref=e946] [cursor=pointer]:
+                - /url: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tiui
+            - cell "10.0 km" [ref=e947]
+            - cell "Sep 20, 06:02 PM" [ref=e948]
+            - cell "—" [ref=e949]
+          - row [ref=e950]:
+            - cell "M4.6" [ref=e951]
+            - cell [ref=e952]:
+              - link "25 km SSW of Shikotan, Russia" [ref=e953] [cursor=pointer]:
+                - /url: https://earthquake.usgs.gov/earthquakes/eventpage/us7000tiu3
+            - cell "57.4 km" [ref=e954]
+            - cell "Sep 20, 04:25 PM" [ref=e955]
+            - cell "—" [ref=e956]
+      - paragraph [ref=e957]: The same data in tabular form — also the accessible path to everything plotted above.

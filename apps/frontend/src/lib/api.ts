@@ -33,6 +33,9 @@ export const PUBLIC_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || '/api
 /** Default timeout so a hung backend cannot hang a page render. */
 const DEFAULT_TIMEOUT_MS = 5_000;
 
+/** Dashboard calls traverse an upstream API, so they get a longer budget. */
+const DASHBOARD_TIMEOUT_MS = 15_000;
+
 export interface HealthResponse {
   status: 'ok';
   service: string;
@@ -57,9 +60,13 @@ export class ApiError extends Error {
 }
 
 /** fetch + timeout + JSON parsing + typed errors. */
-export async function apiFetch<T>(url: string, init: RequestInit = {}): Promise<T> {
+export async function apiFetch<T>(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, {
@@ -81,7 +88,7 @@ export async function apiFetch<T>(url: string, init: RequestInit = {}): Promise<
   } catch (error) {
     if (error instanceof ApiError) throw error;
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new ApiError(`Request to ${url} timed out after ${DEFAULT_TIMEOUT_MS}ms`);
+      throw new ApiError(`Request to ${url} timed out after ${timeoutMs}ms`);
     }
     throw new ApiError(
       error instanceof Error ? error.message : `Unknown error calling ${url}`,
@@ -100,4 +107,109 @@ export function fetchBackendHealth(): Promise<HealthResponse> {
 export function fetchHello(name: string): Promise<HelloResponse> {
   const query = new URLSearchParams({ name });
   return apiFetch<HelloResponse>(`${PUBLIC_API_BASE_URL}/hello?${query.toString()}`);
+}
+
+// --- Seismic dashboard -------------------------------------------------------
+
+export type TimeWindow = 'day' | 'week' | 'month';
+export type AlertLevel = 'green' | 'yellow' | 'orange' | 'red';
+
+export interface QuakeEvent {
+  id: string;
+  magnitude: number;
+  place: string;
+  /** Milliseconds since epoch; formatted client-side in the viewer's locale. */
+  time: number;
+  depth_km: number;
+  longitude: number;
+  latitude: number;
+  url: string;
+  alert: AlertLevel | null;
+  tsunami: boolean;
+  significance: number;
+}
+
+export interface TimeBucket {
+  start: string;
+  count: number;
+  max_magnitude: number | null;
+}
+
+export interface MagnitudeBin {
+  lower: number;
+  upper: number;
+  label: string;
+  count: number;
+}
+
+export interface RegionCount {
+  region: string;
+  count: number;
+  max_magnitude: number;
+}
+
+export interface DepthMagnitudePoint {
+  depth_km: number;
+  magnitude: number;
+  place: string;
+}
+
+export interface QuakeStats {
+  total_events: number;
+  max_magnitude: number | null;
+  strongest: QuakeEvent | null;
+  significant_count: number;
+  tsunami_count: number;
+  median_depth_km: number | null;
+}
+
+export interface QuakeSummary {
+  window: TimeWindow;
+  min_magnitude: number;
+  generated_at: string;
+  cached: boolean;
+  stats: QuakeStats;
+  timeline: TimeBucket[];
+  magnitude_bins: MagnitudeBin[];
+  top_regions: RegionCount[];
+  depth_magnitude: DepthMagnitudePoint[];
+  recent_significant: QuakeEvent[];
+}
+
+/**
+ * Server-side fetch, used by the dashboard Server Component so the first
+ * paint is fully rendered with no client waterfall.
+ */
+export function fetchQuakeSummarySSR(
+  window: TimeWindow,
+  minMagnitude = 2.5,
+): Promise<QuakeSummary> {
+  const query = new URLSearchParams({
+    window,
+    min_magnitude: String(minMagnitude),
+  });
+  return apiFetch<QuakeSummary>(
+    `${BACKEND_INTERNAL_URL}/api/v1/quakes/summary?${query.toString()}`,
+    {},
+    DASHBOARD_TIMEOUT_MS,
+  );
+}
+
+/**
+ * Browser-side fetch for the window filter. Goes through the same-origin
+ * proxy by default, so changing the range needs no CORS and no rebuild.
+ */
+export function fetchQuakeSummary(
+  window: TimeWindow,
+  minMagnitude = 2.5,
+): Promise<QuakeSummary> {
+  const query = new URLSearchParams({
+    window,
+    min_magnitude: String(minMagnitude),
+  });
+  return apiFetch<QuakeSummary>(
+    `${PUBLIC_API_BASE_URL}/quakes/summary?${query.toString()}`,
+    {},
+    DASHBOARD_TIMEOUT_MS,
+  );
 }
