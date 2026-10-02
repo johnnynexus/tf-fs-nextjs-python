@@ -90,19 +90,19 @@ environment costs approximately nothing.
 
 Local development needs only:
 
-| Tool           | Version   | Notes                              |
-| -------------- | --------- | ---------------------------------- |
-| Docker Desktop | any recent | Includes Compose v2.                |
-| Git            | any       |                                     |
+| Tool           | Version    | Notes                |
+| -------------- | ---------- | -------------------- |
+| Docker Desktop | any recent | Includes Compose v2. |
+| Git            | any        |                      |
 
 To work on an app outside Docker, or to deploy:
 
-| Tool        | Version | Used for                       |
-| ----------- | ------- | ------------------------------ |
-| Node.js     | >= 20   | frontend                       |
-| Python      | >= 3.11 | backend                        |
-| Terraform   | >= 1.6  | infrastructure                 |
-| gcloud CLI  | latest  | GCP auth, image pushes         |
+| Tool       | Version | Used for               |
+| ---------- | ------- | ---------------------- |
+| Node.js    | >= 20   | frontend               |
+| Python     | >= 3.11 | backend                |
+| Terraform  | >= 1.6  | infrastructure         |
+| gcloud CLI | latest  | GCP auth, image pushes |
 
 ## Local development
 
@@ -111,12 +111,12 @@ git clone <this-repo> && cd tf-fs-nextjs-python
 docker compose up --build
 ```
 
-| Service   | URL                            |
-| --------- | ------------------------------ |
-| Frontend  | http://localhost:3000          |
-| Dashboard | http://localhost:3000/dashboard |
-| Backend   | http://localhost:8000          |
-| API docs  | http://localhost:8000/docs     |
+| Service   | URL                                |
+| --------- | ---------------------------------- |
+| Frontend  | http://localhost:3000              |
+| Dashboard | http://localhost:3000/dashboard    |
+| Backend   | http://localhost:8000              |
+| API docs  | http://localhost:8000/docs         |
 | Postgres  | localhost:5432 (`app`/`app`/`app`) |
 
 The home page performs two independent round trips to the backend — one from
@@ -177,17 +177,17 @@ terraform fmt -check -recursive
 This is the part most reference repos get hand-wavy about, so it is explicit
 here. There are three paths, and all three work:
 
-| Caller                    | Route                                 | Configured by                       |
-| ------------------------- | ------------------------------------- | ----------------------------------- |
-| Server Component (SSR)    | straight to the backend               | `BACKEND_INTERNAL_URL` (runtime)    |
-| Browser — **default**     | `/api/backend/*` proxy on the frontend | `BACKEND_INTERNAL_URL` (runtime)    |
-| Browser — opt-in          | direct, cross-origin                  | `NEXT_PUBLIC_API_BASE_URL` (build)  |
+| Caller                 | Route                                  | Configured by                      |
+| ---------------------- | -------------------------------------- | ---------------------------------- |
+| Server Component (SSR) | straight to the backend                | `BACKEND_INTERNAL_URL` (runtime)   |
+| Browser — **default**  | `/api/backend/*` proxy on the frontend | `BACKEND_INTERNAL_URL` (runtime)   |
+| Browser — opt-in       | direct, cross-origin                   | `NEXT_PUBLIC_API_BASE_URL` (build) |
 
 **The proxy is the default, and the reason is ordering.** `NEXT_PUBLIC_*`
 values are inlined into the JS bundle by `next build`, but the backend's Cloud
 Run URL does not exist until `terraform apply` has run. Baking it in would
 mean building the image, applying, then rebuilding the image. Proxying through
-a server route reads the target at *request* time from an env var Terraform
+a server route reads the target at _request_ time from an env var Terraform
 sets, so one image is valid in every environment — and browser requests are
 same-origin, so there is no CORS preflight.
 
@@ -260,7 +260,7 @@ Points worth calling out:
 
 - **No long-lived cloud credentials.** Workload Identity Federation exchanges
   a GitHub OIDC token for a short-lived GCP credential. The repository needs
-  zero GitHub *secrets* — only non-sensitive Environment *variables*.
+  zero GitHub _secrets_ — only non-sensitive Environment _variables_.
 - **Path filters** mean a frontend-only PR never starts Python or Postgres,
   and a docs-only PR runs nothing but the final gate.
 - **Reusable workflow** (`_docker-build.yml`) holds the build/auth/push steps
@@ -280,14 +280,14 @@ Create Environments `dev` and `prod` (Settings → Environments), add **required
 reviewers** to `prod`, and set these **variables** (not secrets — none are
 sensitive) in each:
 
-| Variable                         | Source                                          |
-| -------------------------------- | ----------------------------------------------- |
-| `GCP_PROJECT_ID`                 | your project                                     |
-| `GCP_REGION`                     | e.g. `us-west1`                                  |
-| `GCP_WORKLOAD_IDENTITY_PROVIDER` | bootstrap output                                 |
-| `GCP_SERVICE_ACCOUNT`            | bootstrap output                                 |
-| `TF_STATE_BUCKET`                | bootstrap output                                 |
-| `TF_PROJECT_NAME`                | must match `project_name` in the env's tfvars    |
+| Variable                         | Source                                        |
+| -------------------------------- | --------------------------------------------- |
+| `GCP_PROJECT_ID`                 | your project                                  |
+| `GCP_REGION`                     | e.g. `us-west1`                               |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | bootstrap output                              |
+| `GCP_SERVICE_ACCOUNT`            | bootstrap output                              |
+| `TF_STATE_BUCKET`                | bootstrap output                              |
+| `TF_PROJECT_NAME`                | must match `project_name` in the env's tfvars |
 
 ## Configuration reference
 
@@ -296,34 +296,34 @@ nothing sensitive.
 
 ### Backend
 
-| Variable        | Default                 | Purpose                                              |
-| --------------- | ----------------------- | ---------------------------------------------------- |
-| `ENVIRONMENT`   | `local`                 | `local` \| `dev` \| `prod`                            |
-| `PORT`          | `8080`                  | Cloud Run overrides this.                             |
-| `CORS_ORIGINS`  | `http://localhost:3000` | Comma-separated origins.                              |
-| `DATABASE_URL`  | unset                   | Unset ⇒ the app runs without a database.              |
-| `LOG_LEVEL`     | `INFO`                  |                                                       |
-| `RELEASE`       | `dev`                   | Git SHA; surfaced by `/health`.                       |
+| Variable       | Default                 | Purpose                                  |
+| -------------- | ----------------------- | ---------------------------------------- |
+| `ENVIRONMENT`  | `local`                 | `local` \| `dev` \| `prod`               |
+| `PORT`         | `8080`                  | Cloud Run overrides this.                |
+| `CORS_ORIGINS` | `http://localhost:3000` | Comma-separated origins.                 |
+| `DATABASE_URL` | unset                   | Unset ⇒ the app runs without a database. |
+| `LOG_LEVEL`    | `INFO`                  |                                          |
+| `RELEASE`      | `dev`                   | Git SHA; surfaced by `/health`.          |
 
 ### Frontend
 
-| Variable                   | When      | Purpose                                        |
-| -------------------------- | --------- | ---------------------------------------------- |
-| `BACKEND_INTERNAL_URL`     | runtime   | Where the Next.js server reaches the backend.   |
-| `NEXT_PUBLIC_API_BASE_URL` | **build** | Set only for direct browser→backend calls.      |
-| `NEXT_PUBLIC_RELEASE`      | build     | Git SHA.                                        |
+| Variable                   | When      | Purpose                                       |
+| -------------------------- | --------- | --------------------------------------------- |
+| `BACKEND_INTERNAL_URL`     | runtime   | Where the Next.js server reaches the backend. |
+| `NEXT_PUBLIC_API_BASE_URL` | **build** | Set only for direct browser→backend calls.    |
+| `NEXT_PUBLIC_RELEASE`      | build     | Git SHA.                                      |
 
 ### API endpoints
 
-| Method | Path              | Notes                                   |
-| ------ | ----------------- | --------------------------------------- |
-| GET    | `/health`         | Liveness. No I/O.                        |
-| GET    | `/health/ready`   | Readiness, including the database check. |
-| GET    | `/api/v1/hello`   | Example endpoint the frontend calls.     |
-| GET    | `/api/v1/items`   | 503 when no database is configured.      |
-| POST   | `/api/v1/items`   | 503 when no database is configured.      |
-| GET    | `/api/v1/quakes/summary` | Aggregated USGS data for the dashboard. 503 if USGS is unreachable. |
-| POST   | `/api/v1/quakes/cache/clear` | Drop the cached summaries.   |
+| Method | Path                         | Notes                                                               |
+| ------ | ---------------------------- | ------------------------------------------------------------------- |
+| GET    | `/health`                    | Liveness. No I/O.                                                   |
+| GET    | `/health/ready`              | Readiness, including the database check.                            |
+| GET    | `/api/v1/hello`              | Example endpoint the frontend calls.                                |
+| GET    | `/api/v1/items`              | 503 when no database is configured.                                 |
+| POST   | `/api/v1/items`              | 503 when no database is configured.                                 |
+| GET    | `/api/v1/quakes/summary`     | Aggregated USGS data for the dashboard. 503 if USGS is unreachable. |
+| POST   | `/api/v1/quakes/cache/clear` | Drop the cached summaries.                                          |
 
 ## Design decisions
 
@@ -417,3 +417,5 @@ put an Identity-Aware Proxy load balancer in front of the frontend.
 - [`infra/terraform/README.md`](infra/terraform/README.md) — init, plan, apply, destroy
 - [`apps/backend/README.md`](apps/backend/README.md)
 - [`apps/frontend/README.md`](apps/frontend/README.md)
+
+I am change
