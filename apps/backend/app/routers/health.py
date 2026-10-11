@@ -20,6 +20,7 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health", response_model=HealthResponse, summary="Liveness probe")
 async def health() -> HealthResponse:
+    # Liveness stays free of I/O so this probe cannot fail on a dependency.
     return HealthResponse(
         service=settings.app_name,
         environment=settings.environment,
